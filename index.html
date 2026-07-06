@@ -10,8 +10,6 @@
         #container { display: flex; height: 100vh; }
         #map { flex: 3; }
         #sidebar { flex: 1; padding: 15px; background: #f4f4f4; overflow-y: auto; border-left: 2px solid #ccc; }
-        .visited { fill: #4CAF50 !important; } /* Green for visited */
-        .unvisited { fill: #A9A9A9; }
         h1 { margin-top: 0; }
         ul { list-style: none; padding: 0; }
         li { padding: 8px; background: white; margin-bottom: 8px; border-radius: 4px; }
@@ -31,15 +29,15 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Initialize map
         const map = L.map('map').setView([20, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+
+        // Cleaner map style with better country visibility
+        L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        let visited = JSON.parse(localStorage.getItem('familyVisited')) || {}; // { "Country Name": year }
+        let visited = JSON.parse(localStorage.getItem('familyVisited')) || {};
 
-        // Public GeoJSON URL (medium resolution countries)
         const geojsonUrl = "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_0_countries.geojson";
 
         let geojsonLayer;
@@ -50,11 +48,11 @@
             list.innerHTML = '';
             let count = 0;
 
-            Object.keys(visited).forEach(country => {
+            Object.keys(visited).sort().forEach(country => {
                 count++;
                 const li = document.createElement('li');
                 li.innerHTML = `
-                    <strong>${country}</strong> - ${visited[country]}
+                    <strong>${country}</strong> — ${visited[country]}
                     <button onclick="editVisit('${country}')">Edit</button>
                     <button onclick="deleteVisit('${country}')">Delete</button>
                 `;
@@ -65,19 +63,17 @@
 
         function saveVisited() {
             localStorage.setItem('familyVisited', JSON.stringify(visited));
-            if (geojsonLayer) geojsonLayer.setStyle(styleFunction); // Refresh colors
+            if (geojsonLayer) geojsonLayer.setStyle(styleFunction);
             updateSidebar();
         }
 
         function styleFunction(feature) {
             const countryName = feature.properties.ADMIN || feature.properties.NAME;
-            const isVisited = !!visited[countryName];
             return {
-                fillColor: isVisited ? '#4CAF50' : '#A9A9A9',
+                fillColor: visited[countryName] ? '#4CAF50' : '#A9A9A9',
                 weight: 1.5,
-                opacity: 1,
-                color: 'white',
-                fillOpacity: 0.7
+                color: '#555',
+                fillOpacity: 0.75
             };
         }
 
@@ -85,20 +81,19 @@
             const countryName = feature.properties.ADMIN || feature.properties.NAME;
             if (!countryName) return;
 
-            // Hover tooltip
             layer.on({
-                mouseover: function(e) {
-                    const year = visited[countryName] ? `<br>Visited: ${visited[countryName]}` : '';
-                    layer.bindTooltip(`<strong>${countryName}</strong>${year}`, { sticky: true }).openTooltip();
+                mouseover: (e) => {
+                    const year = visited[countryName] ? ` — Visited ${visited[countryName]}` : '';
+                    layer.bindTooltip(`<b>${countryName}</b>${year}`, { sticky: true, direction: 'top' }).openTooltip();
                     layer.setStyle({ fillOpacity: 0.9, weight: 3 });
                 },
-                mouseout: function() {
+                mouseout: (e) => {
                     layer.setStyle(styleFunction(feature));
                 },
-                click: function() {
+                click: () => {
                     let year = visited[countryName] || new Date().getFullYear();
                     year = prompt(`Enter visit year for ${countryName}:`, year);
-                    if (year !== null) {
+                    if (year !== null && year !== "") {
                         visited[countryName] = parseInt(year);
                         saveVisited();
                     }
@@ -106,9 +101,8 @@
             });
         }
 
-        // Load the map
         fetch(geojsonUrl)
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
                 geojsonLayer = L.geoJSON(data, {
                     style: styleFunction,
@@ -116,20 +110,19 @@
                 }).addTo(map);
                 updateSidebar();
             })
-            .catch(err => console.error("Failed to load map data:", err));
+            .catch(err => console.error(err));
 
-        // Global functions for buttons
         window.editVisit = function(country) {
             let year = visited[country] || new Date().getFullYear();
             year = prompt(`Edit year for ${country}:`, year);
-            if (year !== null) {
+            if (year !== null && year !== "") {
                 visited[country] = parseInt(year);
                 saveVisited();
             }
         };
 
         window.deleteVisit = function(country) {
-            if (confirm(`Delete visit record for ${country}?`)) {
+            if (confirm(`Delete ${country}?`)) {
                 delete visited[country];
                 saveVisited();
             }
