@@ -46,7 +46,6 @@
             const countEl = document.getElementById('count');
             list.innerHTML = '';
             let count = 0;
-
             Object.keys(visited).sort().forEach(country => {
                 count++;
                 const li = document.createElement('li');
@@ -66,12 +65,11 @@
 
         function styleFunction(feature) {
             const name = feature.properties.ADMIN || feature.properties.NAME;
-            const isVisited = !!visited[name];
             return {
-                fillColor: isVisited ? '#4ade80' : '#cbd5e1',
+                fillColor: visited[name] ? '#4ade80' : '#cbd5e1',
                 weight: 2.8,
                 color: '#1e2937',
-                fillOpacity: isVisited ? 0.65 : 0.45
+                fillOpacity: visited[name] ? 0.65 : 0.45
             };
         }
 
@@ -79,45 +77,18 @@
             const countryName = feature.properties.ADMIN || feature.properties.NAME;
             if (!countryName) return;
 
-            // Make sure it's clickable
-            layer.options.interactive = true;
+            layer.bindTooltip(countryName, { sticky: true });
 
-            layer.on({
-                mouseover: function () {
-                    this.setStyle({ fillOpacity: 0.9, weight: 4 });
-                    const year = visited[countryName] ? `<br>Visited: ${visited[countryName]}` : '';
-                    this.bindTooltip(`<strong>${countryName}</strong>${year}`, { sticky: true }).openTooltip();
-                },
-                mouseout: function () {
-                    this.setStyle(styleFunction(feature));
-                },
-                click: function () {
-                    // Use popup instead of prompt for reliability
-                    let currentYear = visited[countryName] || new Date().getFullYear();
-                    const popupContent = `
-                        <strong>${countryName}</strong><br><br>
-                        Visit year: <input type="number" id="year-input" value="${currentYear}" style="width:80px;"><br><br>
-                        <button onclick="saveYear('${countryName}')">Save</button>
-                        <button onclick="closePopup()">Cancel</button>
-                    `;
-                    layer.bindPopup(popupContent).openPopup();
+            layer.on('click', function () {
+                alert("✅ Click worked on: " + countryName + "\n\nNow enter the year:");
+                let year = visited[countryName] || new Date().getFullYear();
+                year = prompt("Visit year for " + countryName + ":", year);
+                if (year !== null && year.trim() !== "") {
+                    visited[countryName] = parseInt(year);
+                    saveVisited();
                 }
             });
         }
-
-        // Helper functions for popup
-        window.saveYear = function(countryName) {
-            const input = document.getElementById('year-input');
-            if (input && input.value) {
-                visited[countryName] = parseInt(input.value);
-                saveVisited();
-            }
-            map.closePopup();
-        };
-
-        window.closePopup = function() {
-            map.closePopup();
-        };
 
         fetch(geojsonUrl)
             .then(r => r.json())
@@ -126,22 +97,22 @@
                     style: styleFunction,
                     onEachFeature: onEachFeature
                 }).addTo(map);
-                
                 geojsonLayer.bringToFront();
                 updateSidebar();
-            });
+            })
+            .catch(err => console.error(err));
 
         window.editVisit = function(country) {
             let year = visited[country] || new Date().getFullYear();
-            const newYear = prompt(`Edit year for ${country}:`, year);
-            if (newYear !== null && newYear.trim() !== "") {
-                visited[country] = parseInt(newYear);
+            year = prompt(`Edit year for ${country}:`, year);
+            if (year !== null && year.trim() !== "") {
+                visited[country] = parseInt(year);
                 saveVisited();
             }
         };
 
         window.deleteVisit = function(country) {
-            if (confirm(`Delete visit for ${country}?`)) {
+            if (confirm(`Delete ${country}?`)) {
                 delete visited[country];
                 saveVisited();
             }
