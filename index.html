@@ -31,7 +31,7 @@
     <script>
         const map = L.map('map').setView([20, 0], 2);
 
-        // Good balance: clear labels + political feel
+        // Original good base map
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
@@ -67,11 +67,13 @@
 
         function styleFunction(feature) {
             const name = feature.properties.ADMIN || feature.properties.NAME;
+            const isVisited = !!visited[name];
             return {
-                fillColor: visited[name] ? '#22c55e' : '#e2e8f0',
-                weight: 2.5,           // Thicker borders
-                color: '#1e2937',      // Dark border
-                fillOpacity: 0.75
+                fillColor: isVisited ? '#4ade80' : '#cbd5e1',
+                weight: 2.8,           // Strong borders like first version
+                color: '#1e2937',      // Dark borders
+                fillOpacity: isVisited ? 0.65 : 0.45,   // Less bright
+                interactive: true
             };
         }
 
@@ -81,7 +83,7 @@
 
             layer.on({
                 mouseover: function () {
-                    this.setStyle({ fillOpacity: 0.95, weight: 4 });
+                    this.setStyle({ fillOpacity: 0.85, weight: 4 });
                     const year = visited[countryName] ? `<br>Visited: ${visited[countryName]}` : '';
                     this.bindTooltip(`<strong>${countryName}</strong>${year}`, {
                         sticky: true,
@@ -92,8 +94,7 @@
                     this.setStyle(styleFunction(feature));
                 },
                 click: function (e) {
-                    // Stop map zoom on click
-                    L.DomEvent.stopPropagation(e);
+                    L.DomEvent.stopPropagation(e);   // Important for click
                     let year = visited[countryName] || new Date().getFullYear();
                     const input = prompt(`Enter visit year for ${countryName}:`, year);
                     if (input !== null && input.trim() !== "") {
@@ -112,12 +113,12 @@
                     onEachFeature: onEachFeature
                 }).addTo(map);
                 
-                // Important: Bring country layer on top of tiles
                 geojsonLayer.bringToFront();
                 updateSidebar();
             })
-            .catch(err => alert("Failed to load countries. Check console."));
-
+            .catch(err => console.error(err));
+        
+        // Global functions for sidebar buttons
         window.editVisit = function(country) {
             let year = visited[country] || new Date().getFullYear();
             const input = prompt(`Edit year for ${country}:`, year);
