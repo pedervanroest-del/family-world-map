@@ -31,7 +31,6 @@
     <script>
         const map = L.map('map').setView([20, 0], 2);
 
-        // Original good base map
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
@@ -70,10 +69,9 @@
             const isVisited = !!visited[name];
             return {
                 fillColor: isVisited ? '#4ade80' : '#cbd5e1',
-                weight: 2.8,           // Strong borders like first version
-                color: '#1e2937',      // Dark borders
-                fillOpacity: isVisited ? 0.65 : 0.45,   // Less bright
-                interactive: true
+                weight: 2.8,
+                color: '#1e2937',
+                fillOpacity: isVisited ? 0.65 : 0.45
             };
         }
 
@@ -81,29 +79,45 @@
             const countryName = feature.properties.ADMIN || feature.properties.NAME;
             if (!countryName) return;
 
+            // Make sure it's clickable
+            layer.options.interactive = true;
+
             layer.on({
                 mouseover: function () {
-                    this.setStyle({ fillOpacity: 0.85, weight: 4 });
+                    this.setStyle({ fillOpacity: 0.9, weight: 4 });
                     const year = visited[countryName] ? `<br>Visited: ${visited[countryName]}` : '';
-                    this.bindTooltip(`<strong>${countryName}</strong>${year}`, {
-                        sticky: true,
-                        direction: 'top'
-                    }).openTooltip();
+                    this.bindTooltip(`<strong>${countryName}</strong>${year}`, { sticky: true }).openTooltip();
                 },
                 mouseout: function () {
                     this.setStyle(styleFunction(feature));
                 },
-                click: function (e) {
-                    L.DomEvent.stopPropagation(e);   // Important for click
-                    let year = visited[countryName] || new Date().getFullYear();
-                    const input = prompt(`Enter visit year for ${countryName}:`, year);
-                    if (input !== null && input.trim() !== "") {
-                        visited[countryName] = parseInt(input);
-                        saveVisited();
-                    }
+                click: function () {
+                    // Use popup instead of prompt for reliability
+                    let currentYear = visited[countryName] || new Date().getFullYear();
+                    const popupContent = `
+                        <strong>${countryName}</strong><br><br>
+                        Visit year: <input type="number" id="year-input" value="${currentYear}" style="width:80px;"><br><br>
+                        <button onclick="saveYear('${countryName}')">Save</button>
+                        <button onclick="closePopup()">Cancel</button>
+                    `;
+                    layer.bindPopup(popupContent).openPopup();
                 }
             });
         }
+
+        // Helper functions for popup
+        window.saveYear = function(countryName) {
+            const input = document.getElementById('year-input');
+            if (input && input.value) {
+                visited[countryName] = parseInt(input.value);
+                saveVisited();
+            }
+            map.closePopup();
+        };
+
+        window.closePopup = function() {
+            map.closePopup();
+        };
 
         fetch(geojsonUrl)
             .then(r => r.json())
@@ -115,15 +129,13 @@
                 
                 geojsonLayer.bringToFront();
                 updateSidebar();
-            })
-            .catch(err => console.error(err));
-        
-        // Global functions for sidebar buttons
+            });
+
         window.editVisit = function(country) {
             let year = visited[country] || new Date().getFullYear();
-            const input = prompt(`Edit year for ${country}:`, year);
-            if (input !== null && input.trim() !== "") {
-                visited[country] = parseInt(input);
+            const newYear = prompt(`Edit year for ${country}:`, year);
+            if (newYear !== null && newYear.trim() !== "") {
+                visited[country] = parseInt(newYear);
                 saveVisited();
             }
         };
