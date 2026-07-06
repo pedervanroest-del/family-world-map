@@ -14,7 +14,6 @@
         ul { list-style: none; padding: 0; }
         li { padding: 8px; background: white; margin-bottom: 8px; border-radius: 4px; }
         button { margin-left: 8px; }
-        .leaflet-popup-content { font-size: 14px; }
     </style>
 </head>
 <body>
@@ -30,11 +29,11 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const map = L.map('map', { zoomControl: true }).setView([20, 0], 2);
+        const map = L.map('map').setView([20, 0], 2);
 
-        // Better map style for country visibility
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles © Esri'
+        // Good balance: clear labels + political feel
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
         let visited = JSON.parse(localStorage.getItem('familyVisited')) || {};
@@ -69,10 +68,10 @@
         function styleFunction(feature) {
             const name = feature.properties.ADMIN || feature.properties.NAME;
             return {
-                fillColor: visited[name] ? '#22c55e' : '#94a3b8',
-                weight: 1.8,
-                color: '#1e2937',
-                fillOpacity: 0.8
+                fillColor: visited[name] ? '#22c55e' : '#e2e8f0',
+                weight: 2.5,           // Thicker borders
+                color: '#1e2937',      // Dark border
+                fillOpacity: 0.75
             };
         }
 
@@ -81,22 +80,23 @@
             if (!countryName) return;
 
             layer.on({
-                mouseover: function() {
-                    this.setStyle({ fillOpacity: 0.95, weight: 3 });
+                mouseover: function () {
+                    this.setStyle({ fillOpacity: 0.95, weight: 4 });
                     const year = visited[countryName] ? `<br>Visited: ${visited[countryName]}` : '';
                     this.bindTooltip(`<strong>${countryName}</strong>${year}`, {
                         sticky: true,
-                        direction: "top",
-                        className: "custom-tooltip"
+                        direction: 'top'
                     }).openTooltip();
                 },
-                mouseout: function() {
+                mouseout: function () {
                     this.setStyle(styleFunction(feature));
                 },
-                click: function() {
+                click: function (e) {
+                    // Stop map zoom on click
+                    L.DomEvent.stopPropagation(e);
                     let year = visited[countryName] || new Date().getFullYear();
-                    const input = prompt(`📍 Enter visit year for **${countryName}**`, year);
-                    if (input !== null && input !== "") {
+                    const input = prompt(`Enter visit year for ${countryName}:`, year);
+                    if (input !== null && input.trim() !== "") {
                         visited[countryName] = parseInt(input);
                         saveVisited();
                     }
@@ -111,14 +111,17 @@
                     style: styleFunction,
                     onEachFeature: onEachFeature
                 }).addTo(map);
+                
+                // Important: Bring country layer on top of tiles
+                geojsonLayer.bringToFront();
                 updateSidebar();
-            });
+            })
+            .catch(err => alert("Failed to load countries. Check console."));
 
-        // Global functions
         window.editVisit = function(country) {
             let year = visited[country] || new Date().getFullYear();
             const input = prompt(`Edit year for ${country}:`, year);
-            if (input !== null && input !== "") {
+            if (input !== null && input.trim() !== "") {
                 visited[country] = parseInt(input);
                 saveVisited();
             }
