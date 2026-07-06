@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Travels World Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #container { display: flex; height: 100vh; }
+        #map { flex: 3; }
+        #sidebar { flex: 1; padding: 15px; background: #f4f4f4; overflow-y: auto; border-left: 2px solid #ccc; }
+        .visited { fill: #4CAF50 !important; } /* Green for visited */
+        .unvisited { fill: #A9A9A9; }
+        h1 { margin-top: 0; }
+        ul { list-style: none; padding: 0; }
+        li { padding: 8px; background: white; margin-bottom: 8px; border-radius: 4px; }
+        button { margin-left: 8px; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="map"></div>
+        <div id="sidebar">
+            <h1>Family Travels</h1>
+            <p><strong>Visited countries:</strong> <span id="count">0</span></p>
+            <h3>Visit Log</h3>
+            <ul id="visit-list"></ul>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        let visited = JSON.parse(localStorage.getItem('familyVisited')) || {}; // { "Country Name": year }
+
+        // Public GeoJSON URL (medium resolution countries)
+        const geojsonUrl = "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_110m_admin_0_countries.geojson";
+
+        let geojsonLayer;
+
+        function updateSidebar() {
+            const list = document.getElementById('visit-list');
+            const countEl = document.getElementById('count');
+            list.innerHTML = '';
+            let count = 0;
+
+            Object.keys(visited).forEach(country => {
+                count++;
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <strong>${country}</strong> - ${visited[country]}
+                    <button onclick="editVisit('${country}')">Edit</button>
+                    <button onclick="deleteVisit('${country}')">Delete</button>
+                `;
+                list.appendChild(li);
+            });
+            countEl.textContent = count;
+        }
+
+        function saveVisited() {
+            localStorage.setItem('familyVisited', JSON.stringify(visited));
+            if (geojsonLayer) geojsonLayer.setStyle(styleFunction); // Refresh colors
+            updateSidebar();
+        }
+
+        function styleFunction(feature) {
+            const countryName = feature.properties.ADMIN || feature.properties.NAME;
+            const isVisited = !!visited[countryName];
+            return {
+                fillColor: isVisited ? '#4CAF50' : '#A9A9A9',
+                weight: 1.5,
+                opacity: 1,
+                color: 'white',
+                fillOpacity: 0.7
+            };
+        }
+
+        function onEachFeature(feature, layer) {
+            const countryName = feature.properties.ADMIN || feature.properties.NAME;
+            if (!countryName) return;
+
+            // Hover tooltip
+            layer.on({
+                mouseover: function(e) {
+                    const year = visited[countryName] ? `<br>Visited: ${visited[countryName]}` : '';
+                    layer.bindTooltip(`<strong>${countryName}</strong>${year}`, { sticky: true }).openTooltip();
+                    layer.setStyle({ fillOpacity: 0.9, weight: 3 });
+                },
+                mouseout: function() {
+                    layer.setStyle(styleFunction(feature));
+                },
+                click: function() {
+                    let year = visited[countryName] || new Date().getFullYear();
+                    year = prompt(`Enter visit year for ${countryName}:`, year);
+                    if (year !== null) {
+                        visited[countryName] = parseInt(year);
+                        saveVisited();
+                    }
+                }
+            });
+        }
+
+        // Load the map
+        fetch(geojsonUrl)
+            .then(response => response.json())
+            .then(data => {
+                geojsonLayer = L.geoJSON(data, {
+                    style: styleFunction,
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+                updateSidebar();
+            })
+            .catch(err => console.error("Failed to load map data:", err));
+
+        // Global functions for buttons
+        window.editVisit = function(country) {
+            let year = visited[country] || new Date().getFullYear();
+            year = prompt(`Edit year for ${country}:`, year);
+            if (year !== null) {
+                visited[country] = parseInt(year);
+                saveVisited();
+            }
+        };
+
+        window.deleteVisit = function(country) {
+            if (confirm(`Delete visit record for ${country}?`)) {
+                delete visited[country];
+                saveVisited();
+            }
+        };
+    </script>
+</body>
+</html>
