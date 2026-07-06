@@ -14,13 +14,14 @@
         ul { list-style: none; padding: 0; }
         li { padding: 8px; background: white; margin-bottom: 8px; border-radius: 4px; }
         button { margin-left: 8px; }
+        .leaflet-popup-content { font-size: 14px; }
     </style>
 </head>
 <body>
     <div id="container">
         <div id="map"></div>
         <div id="sidebar">
-            <h1>Family Travels</h1>
+            <h1>Family Travels 🌍</h1>
             <p><strong>Visited countries:</strong> <span id="count">0</span></p>
             <h3>Visit Log</h3>
             <ul id="visit-list"></ul>
@@ -29,11 +30,11 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const map = L.map('map').setView([20, 0], 2);
+        const map = L.map('map', { zoomControl: true }).setView([20, 0], 2);
 
-        // Cleaner map style with better country visibility
-        L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+        // Better map style for country visibility
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles © Esri'
         }).addTo(map);
 
         let visited = JSON.parse(localStorage.getItem('familyVisited')) || {};
@@ -51,11 +52,9 @@
             Object.keys(visited).sort().forEach(country => {
                 count++;
                 const li = document.createElement('li');
-                li.innerHTML = `
-                    <strong>${country}</strong> — ${visited[country]}
-                    <button onclick="editVisit('${country}')">Edit</button>
-                    <button onclick="deleteVisit('${country}')">Delete</button>
-                `;
+                li.innerHTML = `<strong>${country}</strong> — ${visited[country]}
+                    <button onclick="editVisit('${country.replace(/'/g, "\\'")}')">Edit</button>
+                    <button onclick="deleteVisit('${country.replace(/'/g, "\\'")}')">Delete</button>`;
                 list.appendChild(li);
             });
             countEl.textContent = count;
@@ -68,12 +67,12 @@
         }
 
         function styleFunction(feature) {
-            const countryName = feature.properties.ADMIN || feature.properties.NAME;
+            const name = feature.properties.ADMIN || feature.properties.NAME;
             return {
-                fillColor: visited[countryName] ? '#4CAF50' : '#A9A9A9',
-                weight: 1.5,
-                color: '#555',
-                fillOpacity: 0.75
+                fillColor: visited[name] ? '#22c55e' : '#94a3b8',
+                weight: 1.8,
+                color: '#1e2937',
+                fillOpacity: 0.8
             };
         }
 
@@ -82,19 +81,23 @@
             if (!countryName) return;
 
             layer.on({
-                mouseover: (e) => {
-                    const year = visited[countryName] ? ` — Visited ${visited[countryName]}` : '';
-                    layer.bindTooltip(`<b>${countryName}</b>${year}`, { sticky: true, direction: 'top' }).openTooltip();
-                    layer.setStyle({ fillOpacity: 0.9, weight: 3 });
+                mouseover: function() {
+                    this.setStyle({ fillOpacity: 0.95, weight: 3 });
+                    const year = visited[countryName] ? `<br>Visited: ${visited[countryName]}` : '';
+                    this.bindTooltip(`<strong>${countryName}</strong>${year}`, {
+                        sticky: true,
+                        direction: "top",
+                        className: "custom-tooltip"
+                    }).openTooltip();
                 },
-                mouseout: (e) => {
-                    layer.setStyle(styleFunction(feature));
+                mouseout: function() {
+                    this.setStyle(styleFunction(feature));
                 },
-                click: () => {
+                click: function() {
                     let year = visited[countryName] || new Date().getFullYear();
-                    year = prompt(`Enter visit year for ${countryName}:`, year);
-                    if (year !== null && year !== "") {
-                        visited[countryName] = parseInt(year);
+                    const input = prompt(`📍 Enter visit year for **${countryName}**`, year);
+                    if (input !== null && input !== "") {
+                        visited[countryName] = parseInt(input);
                         saveVisited();
                     }
                 }
@@ -109,20 +112,20 @@
                     onEachFeature: onEachFeature
                 }).addTo(map);
                 updateSidebar();
-            })
-            .catch(err => console.error(err));
+            });
 
+        // Global functions
         window.editVisit = function(country) {
             let year = visited[country] || new Date().getFullYear();
-            year = prompt(`Edit year for ${country}:`, year);
-            if (year !== null && year !== "") {
-                visited[country] = parseInt(year);
+            const input = prompt(`Edit year for ${country}:`, year);
+            if (input !== null && input !== "") {
+                visited[country] = parseInt(input);
                 saveVisited();
             }
         };
 
         window.deleteVisit = function(country) {
-            if (confirm(`Delete ${country}?`)) {
+            if (confirm(`Delete visit for ${country}?`)) {
                 delete visited[country];
                 saveVisited();
             }
